@@ -3,17 +3,21 @@ BUILD_DATE      := $(shell date "+%F %T")
 COMMIT_SHA1     := $(shell git rev-parse HEAD)
 
 all:
-	gox -output="dist/{{.Dir}}_{{.OS}}_{{.Arch}}" \
-		-ldflags	"-X 'main.Version=${BUILD_VERSION}' \
-					-X 'main.BuildDate=${BUILD_DATE}' \
-					-X 'main.CommitID=${COMMIT_SHA1}'"
+	bash .cross_compile.sh bark-server
 
 docker:
 	cat deploy/Dockerfile | docker build -t finab/bark-server:${BUILD_VERSION} -f - .
 
+buildx:
+	bash .buildx.sh
+
 release: clean all
 	cp deploy/* dist
-	ghr -u finb -t ${GITHUB_RELEASE_TOKEN} -replace -recreate --debug ${BUILD_VERSION} dist
+	ghr -u finb -t ${GITHUB_TOKEN} -replace -recreate -name "Bump ${BUILD_VERSION}" --debug ${BUILD_VERSION} dist
+
+pre-release: clean all
+	cp deploy/* dist
+	ghr -u finb -t ${GITHUB_TOKEN} -replace -recreate -prerelease -name "Bump ${BUILD_VERSION}" --debug ${BUILD_VERSION} dist
 
 clean:
 	rm -rf dist
@@ -21,10 +25,9 @@ clean:
 install:
 	go install
 
-.PHONY : all release docker clean install
+.PHONY : all release docker buildx clean install
 
 .EXPORT_ALL_VARIABLES:
 
 GO111MODULE = on
-GOPROXY = https://goproxy.io
-GOSUMDB = sum.golang.google.cn
+GOPROXY = https://goproxy.cn
